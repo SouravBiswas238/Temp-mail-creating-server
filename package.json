@@ -1,0 +1,12 @@
+{
+  "name": "tempmail",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:smtp": "npm run dev --workspace packages/smtp-receiver",
+    "dev:api": "npm run dev --workspace packages/api-server",
+    "dev:web": "npm run dev --workspace packages/web"
+  }
+}

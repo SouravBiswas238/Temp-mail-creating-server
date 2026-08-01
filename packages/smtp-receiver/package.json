@@ -1,0 +1,17 @@
+{
+  "name": "@tempmail/smtp-receiver",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@tempmail/shared": "*",
+    "mailparser": "^3.7.2",
+    "mongoose": "^8.9.0",
+    "pino": "^9.5.0",
+    "smtp-server": "^3.13.4"
+  }
+}

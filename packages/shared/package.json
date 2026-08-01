@@ -1,0 +1,10 @@
+{
+  "name": "@tempmail/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "dependencies": {
+    "mongoose": "^8.9.0"
+  }
+}

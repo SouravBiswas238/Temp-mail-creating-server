@@ -1,0 +1,57 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+
+  smtp-receiver:
+    build:
+      context: .
+      dockerfile: packages/smtp-receiver/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://mongo:27017/tempmail
+    ports:
+      # Host 25 -> container 2525. The container process is non-root and
+      # never binds a privileged port itself; Docker's published-port
+      # mapping happens at the host networking layer.
+      - "25:2525"
+
+  api-server:
+    build:
+      context: .
+      dockerfile: packages/api-server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://mongo:27017/tempmail
+    # No host port published - only reachable from other containers
+    # (nginx) on the compose network.
+
+  nginx:
+    build:
+      context: .
+      dockerfile: packages/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+        VITE_MAIL_DOMAIN: ${MAIL_DOMAIN}
+    restart: unless-stopped
+    depends_on:
+      - api-server
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+
+volumes:
+  mongo-data:
+  certbot-etc:
+  certbot-webroot:
