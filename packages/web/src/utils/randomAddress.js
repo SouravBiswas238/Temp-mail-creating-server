@@ -21,3 +21,15 @@ export function generateLocalPart() {
 export function generateAddress(domain) {
   return `${generateLocalPart()}@${domain}`;
 }
+
+const MAX_LOCAL_PART_LENGTH = 64;
+
+// Mirrors the local-part rules the SMTP receiver/API accept
+// (packages/shared/src/domainConfig.js) so a custom prefix the user types
+// here never gets silently rejected server-side.
+export function sanitizeLocalPart(input) {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "")
+    .slice(0, MAX_LOCAL_PART_LENGTH);
+}

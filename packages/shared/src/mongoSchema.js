@@ -23,20 +23,23 @@ const MessageSchema = new Schema({
   messageId: { type: String, default: null },
   size: { type: Number, default: 0 },
   receivedAt: { type: Date, default: Date.now },
+  // Per-mailbox expiry (see mailboxSchema.js MailboxSettings.lifetimeSeconds),
+  // computed at insert time. Using an explicit date + expireAfterSeconds: 0
+  // (expire exactly at this date) instead of a flat expireAfterSeconds on
+  // receivedAt, since Mongo TTL indexes only support one fixed window per
+  // index and different mailboxes can choose different lifetimes.
+  expiresAt: { type: Date, required: true },
   read: { type: Boolean, default: false },
 });
 
-// TTL index: MongoDB's background monitor removes documents once
-// `receivedAt` + expireAfterSeconds has passed. No app-level cleanup needed.
-// The window is configurable via MESSAGE_TTL_SECONDS so it can be shortened in tests.
-export function buildMessageSchema(ttlSeconds) {
+export function buildMessageSchema() {
   const schema = MessageSchema.clone();
-  schema.index({ receivedAt: 1 }, { expireAfterSeconds: ttlSeconds });
+  schema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   schema.index({ to: 1, receivedAt: -1 });
   return schema;
 }
 
-export function getMessageModel(ttlSeconds) {
+export function getMessageModel() {
   if (mongoose.models.Message) return mongoose.models.Message;
-  return mongoose.model("Message", buildMessageSchema(ttlSeconds));
+  return mongoose.model("Message", buildMessageSchema());
 }

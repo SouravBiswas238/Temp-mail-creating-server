@@ -9,5 +9,4 @@ export const config = {
   maxConnectionsPerIpPerMinute: Number(process.env.SMTP_MAX_CONNECTIONS_PER_IP_PER_MIN || 20),
   tlsKeyPath: process.env.SMTP_TLS_KEY_PATH || null,
   tlsCertPath: process.env.SMTP_TLS_CERT_PATH || null,
-  messageTtlSeconds: Number(process.env.MESSAGE_TTL_SECONDS || 864000),
 };

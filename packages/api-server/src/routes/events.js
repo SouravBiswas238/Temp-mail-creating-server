@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { config } from "../config.js";
-import { InvalidAddressError, countMessagesSince } from "../services/messageService.js";
+import { InvalidAddressError } from "../services/addressValidation.js";
+import { checkAccess, resolveCanonicalAddress } from "../services/mailboxService.js";
+import { countMessagesSince } from "../services/messageService.js";
 
 export const eventsRouter = Router();
 
@@ -9,9 +11,14 @@ export const eventsRouter = Router();
 // poll of Mongo rather than a change stream, so it works against a standalone
 // (non-replica-set) MongoDB instance - simplest thing that works for this scale.
 eventsRouter.get("/", async (req, res) => {
-  const { address } = req.query;
+  let address;
   let since;
   try {
+    // EventSource can't set custom headers, so the PIN token travels as a
+    // query param here instead of X-Mailbox-Token like the other routes.
+    address = await resolveCanonicalAddress(req.query.address);
+    const allowed = await checkAccess(address, req.query.token);
+    if (!allowed) return res.status(401).json({ error: "pin_required" });
     since = new Date();
     await countMessagesSince(address, since);
   } catch (err) {

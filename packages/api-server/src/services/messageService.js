@@ -1,16 +1,7 @@
-import { isOwnedAddress, normalizeAddress } from "@tempmail/shared/src/domainConfig.js";
-import { config } from "../config.js";
 import { Message } from "../mongoClient.js";
+import { requireOwnedAddress } from "./addressValidation.js";
 
-export class InvalidAddressError extends Error {}
-
-function requireOwnedAddress(rawAddress) {
-  const normalized = normalizeAddress(rawAddress);
-  if (!normalized || !isOwnedAddress(normalized, config.ownedDomains)) {
-    throw new InvalidAddressError("address is not a valid address for this domain");
-  }
-  return normalized;
-}
+export { InvalidAddressError } from "./addressValidation.js";
 
 const LIST_FIELDS = "to from fromDisplay subject text receivedAt read size attachments";
 
