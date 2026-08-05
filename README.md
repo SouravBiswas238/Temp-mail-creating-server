@@ -1,16 +1,42 @@
 # TempMail
 
 Self-hosted disposable email service: a catch-all SMTP server accepts mail for
-any address at your domain, messages are stored in MongoDB with a 10-day TTL,
-and a React inbox lets anyone who knows the address view it (no auth — same
-model as tempmail.plus).
+any address at your domain, messages are stored in MongoDB with a per-mailbox
+TTL (default 10 days, configurable to 2/7/10 days), and a React inbox lets
+anyone who knows the address view it. Each mailbox can optionally be
+PIN-protected and has a secret alternate address (see "Per-mailbox settings"
+below) — otherwise, same no-auth model as tempmail.plus.
 
 ## Components
 
-- `packages/shared` — Mongoose schema + domain/address validation shared by both backend services.
-- `packages/smtp-receiver` — catch-all SMTP server (`smtp-server` + `mailparser`), receive-only, never relays.
-- `packages/api-server` — Express REST API + SSE for the frontend.
+- `packages/shared` — Mongoose schemas (`Message`, `MailboxSettings`) + domain/address validation + PIN-token signing, shared by both backend services.
+- `packages/smtp-receiver` — catch-all SMTP server (`smtp-server` + `mailparser`), receive-only, never relays. Resolves secret aliases and applies each mailbox's configured lifetime on insert.
+- `packages/api-server` — Express REST API + SSE for the frontend, plus `/api/mailbox/*` for PIN/lifetime/secret-address settings.
 - `packages/web` — React (Vite) inbox UI.
+
+## Per-mailbox settings (PIN, lifetime, secret address)
+
+Opened via the gear icon in the address bar (`SettingsDialog.jsx`):
+- **Lifetime**: 2 / 7 / 10 days, default 10. Stored per-mailbox in
+  `MailboxSettings.lifetimeSeconds`; applied to messages at insert time as an
+  explicit `expiresAt` (Mongo TTL index with `expireAfterSeconds: 0` — expire
+  exactly at that date, since one TTL index can't have different windows per
+  document otherwise). Only affects messages received after the change.
+- **PIN**: 4-10 digits, bcrypt-hashed. Once set, the web UI shows a PIN prompt
+  before revealing that mailbox's inbox, and the API rejects unauthenticated
+  requests for it with `401 { error: "pin_required" }` — enforced server-side
+  on every messages/events request, not just a client-side gate. Changing or
+  clearing an existing PIN requires the current one (no accounts in this
+  system, so this is the only practical guard against a third party who later
+  guesses the address from silently taking over or locking out whoever set
+  it first).
+- **Secret address**: a random `sec-<token>@domain` alias generated per
+  mailbox; mail sent to either address lands in the same inbox (the SMTP
+  receiver resolves it to the canonical address before storing).
+
+PIN sessions: after a correct PIN, a signed token is stored in the browser
+(`localStorage`, per-address) and stays valid until the mailbox's own
+lifetime expires — no need to re-enter it on every reload.
 
 ## Local development
 
@@ -119,6 +145,19 @@ and ports 80/443 were already in use by nginx there.
   this instance, no support ticket was needed.
 
 Live at **https://mail.digiaccess.shop**.
+
+**Not yet deployed to production**: the per-mailbox settings feature (PIN
+protection, configurable lifetime, secret address — see above). Before
+pushing it live:
+1. On the Atlas cluster, drop the old TTL index and let the new one
+   auto-create: `db.messages.dropIndex("receivedAt_1")` (the `expiresAt_1`
+   index is created automatically by Mongoose on next connect). Do this
+   *before* deploying the new code, or messages inserted between the code
+   deploy and the index drop will have both TTL mechanisms briefly active.
+2. Add a real `MAILBOX_TOKEN_SECRET` to `/var/www/tempmail/ecosystem.config.cjs`
+   on the VPS (`openssl rand -hex 32`) — without it, the api-server falls
+   back to an insecure default and logs a warning on startup.
+3. Sync the updated code, `pm2 restart tempmail-smtp tempmail-api`.
 
 ## Namecheap DNS setup — digiaccess.shop (subdomain `mail`)
 

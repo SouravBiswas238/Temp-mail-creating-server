@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import { SMTPServer } from "smtp-server";
 import { simpleParser } from "mailparser";
+import { DEFAULT_LIFETIME_SECONDS } from "@tempmail/shared/src/mailboxSchema.js";
 import { isOwnedAddress, normalizeAddress } from "@tempmail/shared/src/domainConfig.js";
 import { config } from "./config.js";
-import { Message } from "./mongoClient.js";
+import { MailboxSettings, Message } from "./mongoClient.js";
 import { createConnectionRateLimiter } from "./rateLimiter.js";
 
 const connectionLimiter = createConnectionRateLimiter({
@@ -12,6 +13,18 @@ const connectionLimiter = createConnectionRateLimiter({
 
 function remoteIp(session) {
   return session.remoteAddress || "unknown";
+}
+
+// A recipient may be either a mailbox's canonical address or its secret
+// alias (see mailboxSchema.js) - both must deliver into the same inbox.
+// Resolves whichever was used down to { canonical, lifetimeSeconds }.
+async function resolveRecipient(to) {
+  const settings = await MailboxSettings.findOne({
+    $or: [{ address: to }, { secretAlias: to }],
+  }).lean();
+
+  if (!settings) return { canonical: to, lifetimeSeconds: DEFAULT_LIFETIME_SECONDS };
+  return { canonical: settings.address, lifetimeSeconds: settings.lifetimeSeconds };
 }
 
 export function createSmtpServer(logger) {
@@ -68,22 +81,25 @@ export function createSmtpServer(logger) {
 
       simpleParser(stream)
         .then(async (parsed) => {
-          const recipients = (session.envelope.rcptTo || [])
+          const rawRecipients = (session.envelope.rcptTo || [])
             .map((r) => normalizeAddress(r.address))
             .filter((addr) => addr && isOwnedAddress(addr, config.ownedDomains));
 
-          if (recipients.length === 0) {
+          if (rawRecipients.length === 0) {
             // Shouldn't happen since onRcptTo already filtered, but never write
             // a message with no valid owned recipient.
             return callback();
           }
 
+          const resolved = await Promise.all(rawRecipients.map(resolveRecipient));
+
           const fromAddress = parsed.from?.value?.[0]?.address || session.envelope.mailFrom?.address || "unknown";
+          const receivedAt = new Date();
 
           await Promise.all(
-            recipients.map((to) =>
+            resolved.map(({ canonical, lifetimeSeconds }) =>
               Message.create({
-                to,
+                to: canonical,
                 from: fromAddress.toLowerCase(),
                 fromDisplay: parsed.from?.text || fromAddress,
                 subject: parsed.subject || "(no subject)",
@@ -97,12 +113,16 @@ export function createSmtpServer(logger) {
                 })),
                 messageId: parsed.messageId || null,
                 size,
-                receivedAt: new Date(),
+                receivedAt,
+                expiresAt: new Date(receivedAt.getTime() + lifetimeSeconds * 1000),
               })
             )
           );
 
-          logger.info({ to: recipients, from: fromAddress, size }, "message stored");
+          logger.info(
+            { to: resolved.map((r) => r.canonical), from: fromAddress, size },
+            "message stored"
+          );
           callback();
         })
         .catch((err) => {

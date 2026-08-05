@@ -9,7 +9,7 @@ const POLL_FALLBACK_MS = 5000;
 // polling if EventSource errors out (e.g. blocked by a proxy) - the browser's
 // native EventSource already retries on transient drops, so this fallback is
 // only for the case where SSE itself can't be established at all.
-export function useInboxUpdates(address) {
+export function useInboxUpdates(address, token) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -18,7 +18,7 @@ export function useInboxUpdates(address) {
     const invalidate = () => queryClient.invalidateQueries({ queryKey: ["messages", address] });
 
     let pollTimer = null;
-    const source = new EventSource(eventsUrl(address));
+    const source = new EventSource(eventsUrl(address, token));
 
     source.addEventListener("new-message", invalidate);
     source.onerror = () => {
@@ -32,5 +32,5 @@ export function useInboxUpdates(address) {
       source.close();
       if (pollTimer) clearInterval(pollTimer);
     };
-  }, [address, queryClient]);
+  }, [address, token, queryClient]);
 }

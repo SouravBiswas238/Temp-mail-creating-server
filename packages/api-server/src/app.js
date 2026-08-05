@@ -4,6 +4,7 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import { config } from "./config.js";
 import { eventsRouter } from "./routes/events.js";
+import { mailboxRouter } from "./routes/mailbox.js";
 import { messagesRouter } from "./routes/messages.js";
 
 export function createApp() {
@@ -33,6 +34,7 @@ export function createApp() {
   app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
   app.use("/api/messages", messagesRouter);
   app.use("/api/events", eventsRouter);
+  app.use("/api/mailbox", mailboxRouter);
 
   app.use((err, _req, res, _next) => {
     // eslint-disable-next-line no-console

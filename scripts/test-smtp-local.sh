@@ -17,9 +17,9 @@ if ! command -v swaks >/dev/null 2>&1; then
 fi
 
 echo "== 1. Valid catch-all delivery (expect 250 accepted) =="
-swaks --to "randomtest123@${DOMAIN}" --from "sender@example.com" \
+swaks --to "sourav@${DOMAIN}" --from "sender@example.com" \
       --server "$HOST" --port "$PORT" \
-      --header "Subject: Hello from test script" \
+      --header "Subject: Hello from test script " \
       --body "This is a test message."
 
 echo
@@ -30,4 +30,4 @@ swaks --to "someone@not-owned-domain.example" --from "sender@example.com" \
 set -e
 
 echo
-echo "== 3. Done. Check MongoDB: db.messages.findOne({ to: \"randomtest123@${DOMAIN}\" }) =="
+echo "== 3. Done. Check MongoDB: db.messages.findOne({ to: \"sunnyripple70503@${DOMAIN}\" }) =="

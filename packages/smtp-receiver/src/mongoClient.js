@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { getMailboxSettingsModel } from "@tempmail/shared/src/mailboxSchema.js";
 import { getMessageModel } from "@tempmail/shared/src/mongoSchema.js";
 import { config } from "./config.js";
 
@@ -10,4 +11,5 @@ export async function connectMongo() {
   connected = true;
 }
 
-export const Message = getMessageModel(config.messageTtlSeconds);
+export const Message = getMessageModel();
+export const MailboxSettings = getMailboxSettingsModel();
